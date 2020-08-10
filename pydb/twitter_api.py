@@ -14,55 +14,77 @@ class TList:
 
     def __init__(self, list_name):
         self.list_name = list_name
-        self.last_tweets = deque([], 200)
+        # self.last_tweets = deque([], 200)
+        self.last_tweets_a = [None for i in range(100)]
 
-
-        time_sn = 'saved_json' + time.ctime().replace(' ', '_').replace(':', '') + '.txt'
+        time_sn = 'saved_json' + time.ctime().replace(' ', '_').replace(':', '') + '.json'
         new_tweets = api.GetListTimeline(owner_screen_name=config['owner_screen_name'], slug=list_name, include_rts=True,
                                          count=200, return_json=True)
         std_tweets = sorted(new_tweets, key=lambda x: datetime.strptime(x['created_at'], '%a %b %d %H:%M:%S %z %Y'))
-        for tweet in std_tweets:
-            self.last_tweets.appendleft(tweet)
 
         fd = open(os.path.abspath(data_path + list_name + "_" + time_sn), 'w')
-        fd.write(json.dumps(list(self.last_tweets)))
+        fd.write(json.dumps(std_tweets))
         fd.close()
-        self.saved_till = datetime.strptime(self.last_tweets[0]['created_at'], '%a %b %d %H:%M:%S %z %Y')
-        self.last_last_dt = datetime.strptime(self.last_tweets[0]['created_at'], '%a %b %d %H:%M:%S %z %Y')
+        self.saved_till = datetime.strptime(std_tweets[-1]['created_at'], '%a %b %d %H:%M:%S %z %Y')
+        self.last_last_dt = datetime.strptime(std_tweets[-1]['created_at'], '%a %b %d %H:%M:%S %z %Y')
+        # self.last_text = std_tweets[0]['text']
         self.save_mark = 0
     def api_store_list(self):
-        temp_save_mark = 0
-        time_sn = 'saved_json' + time.ctime().replace(' ', '_').replace(':', '') + '.txt'
+        iter_save_mark = 0
+        time_sn = 'saved_json' + time.ctime().replace(' ', '_').replace(':', '') + '.json'
         new_tweets = api.GetListTimeline(owner_screen_name=config['owner_screen_name'], slug=self.list_name, include_rts=True,
                                          count=200, return_json=True)
 
-        nt_q = deque(sorted(new_tweets, key=lambda x: datetime.strptime(x['created_at'], '%a %b %d %H:%M:%S %z %Y')))
+        # nt_q = deque(sorted(new_tweets, key=lambda x: datetime.strptime(x['created_at'], '%a %b %d %H:%M:%S %z %Y')))
         nt_l = sorted(new_tweets, key=lambda x: datetime.strptime(x['created_at'], '%a %b %d %H:%M:%S %z %Y'))
-        list.reverse(nt_l)
+        # sorted_ds = [t["created_at"] for t in nt_l]
+        # list.reverse(nt_l)
+        new_last_index = 0
         for i, pj_dic in enumerate(nt_l):
             if datetime.strptime(pj_dic['created_at'], '%a %b %d %H:%M:%S %z %Y') == self.last_last_dt:
-                new_last_index = len(nt_l) - i - 1
-                temp_save_mark = self.save_mark
-                self.save_mark += i + 1
+                # print('new: ' + pj_dic["text"] + ', Old: ' + self.last_text + '\n')
+                new_last_index =  i 
+                # iter_save_mark = self.save_mark
+                # self.save_mark += i + 1
                 break
-            else:
-                new_last_index = len(nt_l)
 
-        if self.save_mark >= 120:
-            st_name = self.saved_till.strftime("%Y-%b-%d_%H%M%S")
-            last_last_dt_name = self.last_last_dt.strftime("%Y-%b-%d_%H%M%S")
-            fd = open(os.path.abspath(data_path + self.list_name + "_" \
-                                      + st_name + 'to' + last_last_dt_name + '.txt'), 'w')
-            fd.write(json.dumps(list(self.last_tweets)))
-            fd.close()
-            print('saved {0} tweets from list {1} at'.format(temp_save_mark, self.list_name) + time.ctime() + '\n')
-            self.saved_till = self.last_last_dt
-            self.save_mark = 0
-        new_tbs = nt_l[:new_last_index]
+        new_tbs = nt_l[new_last_index + 1:]
+        print('new ones:(' + self.list_name + ') \n')
         for pj_dic in new_tbs:
-            self.last_tweets.appendleft(pj_dic)
+            print(' ' + pj_dic['text'] + '\n')
+            self.last_tweets_a[self.save_mark] = pj_dic
+            self.save_mark += 1
+            if self.save_mark == 100:
+                st_name = self.saved_till.strftime("%Y-%b-%d_%H%M%S")
+                last_last_dt_name = self.last_last_dt.strftime("%Y-%b-%d_%H%M%S")
+                fd = open(os.path.abspath(data_path + self.list_name + "_" \
+                                        + st_name + 'to' + last_last_dt_name + '.txt'), 'w')
+                fd.write(json.dumps(list(self.last_tweets_a)))
+                fd.close()
+                print('saved {0} tweets from list {1} at'.format(self.save_mark, self.list_name) + time.ctime() + '\n')
+                self.saved_till = self.last_last_dt
+                self.save_mark = 0
+                # self.last_tweets.clear()
+        print('save_mark: (' + self.list_name + ') ' +  str(self.save_mark) + '\n')
 
-        self.last_last_dt = datetime.strptime(new_tweets[0]['created_at'], '%a %b %d %H:%M:%S %z %Y')
+
+        self.last_last_dt = datetime.strptime(nt_l[-1]['created_at'], '%a %b %d %H:%M:%S %z %Y')
+        
+        # if self.save_mark >= 120:
+        #     st_name = self.saved_till.strftime("%Y-%b-%d_%H%M%S")
+        #     last_last_dt_name = self.last_last_dt.strftime("%Y-%b-%d_%H%M%S")
+        #     fd = open(os.path.abspath(data_path + self.list_name + "_" \
+        #                               + st_name + 'to' + last_last_dt_name + '.txt'), 'w')
+        #     fd.write(json.dumps(list(self.last_tweets)))
+        #     fd.close()
+        #     print('saved {0} tweets from list {1} at'.format(iter_save_mark, self.list_name) + time.ctime() + '\n')
+        #     self.saved_till = self.last_last_dt
+        #     self.save_mark = 0
+        # new_tbs = nt_l[:new_last_index]
+        # print('new ones:(' + self.list_name + ') \n')
+        # for pj_dic in new_tbs:
+        #     print(' ' + pj_dic['text'] + '\n')
+        #     self.last_tweets.appendleft(pj_dic)
 
 
 
@@ -174,7 +196,7 @@ def last_get_list():
             flush = True
 
         print(time.ctime())
-        time.sleep(700)
+        time.sleep(20)
 
 
 
@@ -183,11 +205,13 @@ def get_list_tls():
 
     for list_name in config['lists']:
         tlists.append(TList(list_name))
+    for tlist in tlists:
+        tlist.api_store_list()
     while 1:
         for tlist in tlists:
             tlist.api_store_list()
         print('checked at' + time.ctime())
-        time.sleep(300)
+        time.sleep(100)
 
 
 def load_config(config_file, path):

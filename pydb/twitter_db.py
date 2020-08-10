@@ -564,9 +564,9 @@ def load_file(path):
 
     cnx.commit()
 
-def initializedb():
+def initializedb(password):
     global cnx
-    cnx = mysql.connector.connect(user='root', host='127.1.1.1', database='twitterapi', charset='utf8mb4')
+    cnx = mysql.connector.connect(user='root', passwd=password, host='127.1.1.1', database='twitterapi', charset='utf8mb4')
     cursor = cnx.cursor(buffered=True)
 
     create_tweets()
