@@ -34,24 +34,33 @@ class TList:
                                          count=200, return_json=True)
 
         nt_l = sorted(new_tweets, key=lambda x: datetime.strptime(x['created_at'], '%a %b %d %H:%M:%S %z %Y'))
+
         new_last_index = 0
         for i, pj_dic in enumerate(nt_l):
-            if datetime.strptime(pj_dic['created_at'], '%a %b %d %H:%M:%S %z %Y') == self.last_last_dt:
+            if datetime.strptime(pj_dic['created_at'], '%a %b %d %H:%M:%S %z %Y') < self.last_last_dt:
                 new_last_index =  i 
+            else:
                 break
+        index_start = new_last_index + 2 if new_last_index else new_last_index
+        new_tbs = nt_l[index_start:]
 
-        new_tbs = nt_l[new_last_index + 1:]
-        print('new ones:(' + self.list_name + ') \n')
+        print("new_tbs size : {0}".format(len(new_tbs)))
+        if len(new_tbs) > 100:
+            print("new_tbs large({0}) at index {1} in nt_l:".format(len(new_tbs), new_last_index))
+            for i, t in enumerate(nt_l):
+                print('{0} {1} \n'.format(i, t['created_at']))
+        # print('new ones:(' + self.list_name + ') \n')
         for pj_dic in new_tbs:
-            print(' ' + pj_dic['text'] + '\n')
+            # print(' ' + pj_dic['text'] + '\n')
             self.last_tweets_a[self.save_mark] = pj_dic
             self.save_mark += 1
             if self.save_mark == 100:
                 st_name = self.saved_till.strftime("%Y-%b-%d_%H%M%S")
+                self.last_last_dt = datetime.strptime(pj_dic['created_at'], '%a %b %d %H:%M:%S %z %Y')
                 last_last_dt_name = self.last_last_dt.strftime("%Y-%b-%d_%H%M%S")
                 fd = open(os.path.abspath(data_path + self.list_name + "_" \
                                         + st_name + 'to' + last_last_dt_name + '.json'), 'w')
-                fd.write(json.dumps(list(self.last_tweets_a)))
+                fd.write(json.dumps(self.last_tweets_a))
                 fd.close()
                 print('saved {0} tweets from list {1} at'.format(self.save_mark, self.list_name) + time.ctime() + '\n')
                 self.saved_till = self.last_last_dt
