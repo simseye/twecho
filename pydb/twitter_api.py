@@ -87,7 +87,7 @@ def get_list_tls():
         for tlist in tlists:
             tlist.api_store_list()
         print('checked at' + time.ctime())
-        time.sleep(100)
+        time.sleep(300)
 
 
 def load_config(config_file, path):
