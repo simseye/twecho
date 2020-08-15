@@ -3,6 +3,7 @@ import twitter
 import os
 import json
 import time
+import requests
 from collections import  deque
 from datetime import datetime
 
@@ -30,9 +31,12 @@ class TList:
     def api_store_list(self):
         iter_save_mark = 0
         time_sn = 'saved_json' + time.ctime().replace(' ', '_').replace(':', '') + '.json'
-        new_tweets = api.GetListTimeline(owner_screen_name=config['owner_screen_name'], slug=self.list_name, include_rts=True,
+        try:
+            new_tweets = api.GetListTimeline(owner_screen_name=config['owner_screen_name'], slug=self.list_name, include_rts=True,
                                          count=200, return_json=True)
-
+        except requests.exceptions.ConnectionError as err:
+            print(err)
+            print('error handeled')
         nt_l = sorted(new_tweets, key=lambda x: datetime.strptime(x['created_at'], '%a %b %d %H:%M:%S %z %Y'))
 
         new_last_index = 0
