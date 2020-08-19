@@ -11,7 +11,7 @@ from datetime import datetime
 from twitter.error import TwitterError
 import calendar
 
-
+#use prepared statements or parameters
 #tweets = [tdic['text'] for tdic in jarray]
 #sizes = [len(tweet) for tweet in tweets]
 #tweetse = [tweet.encode('utf-8') for tweet in tweets]
@@ -285,13 +285,13 @@ def insert_tweet(tj_dic, depth):
     cnx.cmd_query(insert_string)
 
     if  tj_dic.get('is_quote_status', None):
-        depth += 1
-        if depth > 5: return
-        try:
+        # depth += 1
+        # if depth > 5: return
+        # try:
 
-            insert_tweet( api.GetStatus(status_id=tj_dic['quoted_status_id']).AsDict(), depth)
-        except TwitterError:
-            pass
+        #     insert_tweet( api.GetStatus(status_id=tj_dic['quoted_status_id']).AsDict(), depth)
+        # except TwitterError:
+        #     pass
         insert_qt_tweet(tj_dic['quoted_status_id'], tj_dic['id'])
     if tj_dic.get('retweeted_status', None) is not None:
         retweet_id = tj_dic['retweeted_status']['id']
