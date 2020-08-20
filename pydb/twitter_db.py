@@ -36,8 +36,8 @@ def create_tweets():
                in_reply_to_status_id bigint,\
                in_reply_to_user_id bigint,\
                in_reply_to_screen_name varchar(15),\
-               coordinates varchar(50),\
-               place_url varchar(500),\
+               coordinates_long decimal(9,7),\
+               coordinates_lat decimal(9,7),\
                is_quote_status bool,\
                quoted_status_id bigint,\
                quoted_status varchar(280),\
@@ -118,9 +118,11 @@ def create_urls():
                      primary key (id)\
                      )')
     cnx.cmd_query('create table if not exists urls_tid(\
-                   tweet_id bigint references tweets(id),\
-                   url_id bigint references urls(id),\
-                   primary key(url_id, tweet_id)\
+                    tweet_id bigint,\
+                    url_id bigint,\
+                    foreign key(tweet_id) references tweets(id),\
+                    foreign key(url_id) references urls(id),\
+                    primary key(url_id, tweet_id)\
                   )')
 
 
@@ -140,7 +142,8 @@ def create_med_size():
                    small_h int,\
                    small_resize varchar(5),\
                    small_w int,\
-                   media_id bigint references media(id)\
+                   media_id bigint,\
+                   foreign key(media_id) references media(id)\
                    )')
 
 
@@ -158,8 +161,10 @@ def create_media():
                 )')
     create_med_size()
     cnx.cmd_query('create table if not exists media_tid(\
-                   tweet_id bigint references tweet(id),\
-                   media_id bigint references media(id),\
+                   tweet_id bigint,\
+                   media_id bigint,\
+                   foreign key(media_id) references media(id),\
+                   foreign key(tweet_id) references tweets(id),\
                    primary key (media_id, tweet_id )\
             )')
 
@@ -185,118 +190,146 @@ def create_hashtags():
                    primary key (id)\
                    )')
     cnx.cmd_query('create table if not exists hashtag_tweet(\
-                   hashtag_id bigint references hashtags(id),\
-                   tweet_id bigint references tweets(id),\
+                   hashtag_id bigint,\
+                   tweet_id bigint,\
+                   foreign key(tweet_id) references tweets(id),\
+                   foreign key(hashtag_id) references hashtags(id),\
                    primary key(hashtag_id, tweet_id)\
                    )')
 
 
 def create_rt_tweet():
     cnx.cmd_query('create table if not exists rt_tweet(\
-                   retweet_id bigint references tweet(id),\
-                   tweet_id bigint references tweet(id),\
+                   retweet_id bigint,\
+                   tweet_id bigint,\
+                   foreign key(tweet_id) references tweets(id),\
+                   foreign key(retweet_id) references tweets(id),\
                    primary key(retweet_id, tweet_id)\
                    )')
 
 
 def create_qt_tweet():
     cnx.cmd_query('create table if not exists qt_tweet(\
-                   quote_tweet_id bigint references tweet(id),\
-                   tweet_id bigint references tweet(id),\
+                   quote_tweet_id bigint,\
+                   tweet_id bigint,\
+                   foreign key(tweet_id) references tweets(id),\
+                   foreign key(quote_tweet_id) references tweets(id),\
                    primary key(quote_tweet_id, tweet_id)\
                    )')
 
+def create_place():
+    cnx.cmd_query('create table if not exists place(\
+                    tweet_id bigint,\
+                    id varchar(20),\
+                    url varchar(100),\
+                    place_type varchar(10),\
+                    city_name varchar(80),\
+                    full_name varchar(100),\
+                    country_code char(2),\
+                    country varchar(60),\
+                    bb_a_long decimal(9,6),\
+                    bb_a_lat decimal(9,6),\
+                    bb_b_long decimal(9,6),\
+                    bb_b_lat decimal(9,6),\
+                    bb_c_long decimal(9,6),\
+                    bb_c_lat decimal(9,6),\
+                    bb_d_long decimal(9,6),\
+                    bb_d_lat decimal(9,6),\
+                    bb_type varchar(20),\
+                    foreign key(tweet_id) references tweets(id),\
+                    primary key(tweet_id, id)\
+                    )')
+                    
+
+
+
 def insert_tweets(jarray):
-
     for tj_dic in jarray:
+        tweet_dt = datetime.strptime(tj_dic['created_at'], '%a %b %d %H:%M:%S %z %Y')
+        ddb_dt = tweet_dt.strftime("%Y-%b-%d %H:%M:%S")
+        ddb_dt = ddb_dt[:5] + str(tweet_dt.month) + ddb_dt[8:]
 
-        insert_tweet(tj_dic, 1)
+        if tj_dic.get('in_reply_to_screen_name', None):
+            irtsn = '"' + str(tj_dic['in_reply_to_screen_name'].replace('"', '\\"')) + '"'
+        else:
+            irtsn = "NULL"
 
+        if tj_dic.get('place', None):
+            place = '"' + str(tj_dic['place']) + '"'
+        else:
+            place = "NULL"
 
-def insert_tweet(tj_dic, depth):
-    tweet_dt = datetime.strptime(tj_dic['created_at'], '%a %b %d %H:%M:%S %z %Y')
-    ddb_dt = tweet_dt.strftime("%Y-%b-%d %H:%M:%S")
-    ddb_dt = ddb_dt[:5] + str(tweet_dt.month) + ddb_dt[8:]
+        if tj_dic.get('coordinates', None):
+            coords_long = tj_dic['coordinates']['coordinates'][0] 
+            coords_lat = tj_dic['coordinates']['coordinates'][1] 
+        else:
+            coords_long = "NULL"
+            coords_lat = "NULL"
 
-    if tj_dic.get('in_reply_to_screen_name', None):
-        irtsn = '"' + str(tj_dic['in_reply_to_screen_name'].replace('"', '\\"')) + '"'
-    else:
-        irtsn = "NULL"
+        if tj_dic.get('source', None):
+            source= '"' + str(tj_dic['source'].replace('"', '\\"')) + '"'
+        else:
+            source = "NULL"
 
-    if tj_dic.get('place', None):
-        place = '"' + str(tj_dic['place']) + '"'
-    else:
-        place = "NULL"
+        insert_string = ''
+        insert_string = \
+            'insert ignore into tweets (\
+            created_at,\
+            id,\
+            text,\
+            screen_name,\
+            retweet_count,\
+            favorite_count ,\
+            source ,\
+            user_id ,\
+            in_reply_to_status_id,\
+            in_reply_to_user_id ,\
+            in_reply_to_screen_name ,\
+            coordinates_long ,\
+            coordinates_lat,\
+            is_quote_status,\
+            quoted_status_id,\
+            favorited ,\
+            retweeted ,\
+            lang, \
+            reply_count )\
+            values("{0}", {1}, "{2}", "{3}", {4},\
+            {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14}, {15}, {16}, "{17}", {18})'.format(
+                ddb_dt,
+                int(tj_dic['id_str']),
+                tj_dic['text'].replace('"', '\\"'),
+                tj_dic['user']['screen_name'].replace('"', '\\"'),
+                tj_dic.get('retweet_count', "NULL"),
+                tj_dic.get('favorite_count', "NULL"),
+                source,
+                tj_dic['user']['id'],
+                tj_dic.get('in_reply_to_status_id', None) if tj_dic.get('in_reply_to_status_id', None) else "NULL",
+                tj_dic.get('in_reply_to_user_id', None) if tj_dic.get('in_reply_to_user_id', None) else "NULL",
+                irtsn,
+                coords_long,
+                coords_lat,
+                tj_dic.get('is_quote_status', "NULL"),
+                tj_dic.get('quoted_status_id', "NULL"),
+                tj_dic.get('favorited', "NULL"),
+                tj_dic.get('retweeted', "NULL"),
+                tj_dic['lang'],
+                tj_dic.get('reply_count', "NULL")
+            )
+        cnx.cmd_query(insert_string)
 
-    if tj_dic.get('coordinates', None):
-        coords = '"' + str(tj_dic['coordinates']) + '"'
-    else:
-        coords = "NULL"
+        if  tj_dic.get('is_quote_status', None):
+            # depth += 1
+            # if depth > 5: return
+            # try:
 
-    if tj_dic.get('source', None):
-        source= '"' + str(tj_dic['source'].replace('"', '\\"')) + '"'
-    else:
-        source = "NULL"
-
-    insert_string = ''
-    insert_string = \
-        'insert ignore into tweets (\
-        created_at,\
-        id,\
-        text,\
-        screen_name,\
-        retweet_count,\
-        favorite_count ,\
-        source ,\
-        user_id ,\
-        in_reply_to_status_id,\
-        in_reply_to_user_id ,\
-        in_reply_to_screen_name ,\
-        coordinates ,\
-        place_url ,\
-        is_quote_status,\
-        quoted_status_id,\
-        favorited ,\
-        retweeted ,\
-        lang, \
-        reply_count )\
-        values("{0}", {1}, "{2}", "{3}", {4},\
-        {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14}, {15}, {16}, "{17}", {18})'.format(
-            ddb_dt,
-            tj_dic['id'],
-            tj_dic['text'].replace('"', '\\"'),
-            tj_dic['user']['screen_name'].replace('"', '\\"'),
-            tj_dic.get('retweet_count', "NULL"),
-            tj_dic.get('favorite_count', "NULL"),
-            source,
-            tj_dic['user']['id'],
-            tj_dic.get('in_reply_to_status_id', None) if tj_dic.get('in_reply_to_status_id', None) else "NULL",
-            tj_dic.get('in_reply_to_user_id', None) if tj_dic.get('in_reply_to_user_id', None) else "NULL",
-            irtsn,
-            coords,
-            place,
-            tj_dic.get('is_quote_status', "NULL"),
-            tj_dic.get('quoted_status_id', "NULL"),
-            tj_dic.get('favorited', "NULL"),
-            tj_dic.get('retweeted', "NULL"),
-            tj_dic['lang'],
-            tj_dic.get('reply_count', "NULL")
-        )
-    cnx.cmd_query(insert_string)
-
-    if  tj_dic.get('is_quote_status', None):
-        # depth += 1
-        # if depth > 5: return
-        # try:
-
-        #     insert_tweet( api.GetStatus(status_id=tj_dic['quoted_status_id']).AsDict(), depth)
-        # except TwitterError:
-        #     pass
-        insert_qt_tweet(tj_dic['quoted_status_id'], tj_dic['id'])
-    if tj_dic.get('retweeted_status', None) is not None:
-        retweet_id = tj_dic['retweeted_status']['id']
-        insert_tweet(tj_dic['retweeted_status'], 1)
-        insert_rt_tweet(retweet_id, tj_dic['id'])
+            #     insert_tweet( api.GetStatus(status_id=tj_dic['quoted_status_id']).AsDict(), depth)
+            # except TwitterError:
+            #     pass
+            insert_qt_tweet(tj_dic['quoted_status_id'], int(tj_dic['id_str']))
+        if tj_dic.get('retweeted_status', None) is not None:
+            retweet_id = tj_dic['retweeted_status']['id']
+            # insert_tweet(tj_dic['retweeted_status'], 1)
+            insert_rt_tweet(retweet_id, int(tj_dic['id_str']))
 
 def insert_users(jarray):
     for  tj_dic in jarray:
@@ -419,7 +452,7 @@ def insert_urls(jarray):
             url_id) \
             values({0}, last_insert_id());'\
             .format(
-            tj_dic['id']
+            int(tj_dic['id_str'])
             )
             cnx.cmd_query(url_tid_string)
 
@@ -491,7 +524,7 @@ def insert_media(jarray):
                 media_id \
                 )\
                 values({0}, {1})'.format(
-                tj_dic['id'],
+                int(tj_dic['id_str']),
                 media['id']
                 )
             cnx.cmd_query(media_tid_string)
@@ -519,7 +552,7 @@ def insert_hashtags(jarray):
                 tweet_id ,\
                 )\
                 values(last_insert_id(), {0})'.format(
-                tj_dic['id']
+                int(tj_dic['id_str'])
                 )
             cnx.cmd_query(hashtag_tweet)
 
@@ -548,10 +581,59 @@ def insert_qt_tweet(qt_id, t_id):
         )
     cnx.cmd_query(qt_tweet_s)
 
+def insert_place(jarray):
+    for tj_dic in jarray:
+        if tj_dic['place'] is not None:
+            insert_place =\
+                'insert ignore into place(\
+                    tweet_id,\
+                    id,\
+                    url,\
+                    place_type,\
+                    city_name,\
+                    full_name,\
+                    country_code,\
+                    country,\
+                    bb_a_long ,\
+                    bb_a_lat ,\
+                    bb_b_long,\
+                    bb_b_lat ,\
+                    bb_c_long,\
+                    bb_c_lat ,\
+                    bb_d_long,\
+                    bb_d_lat,\
+                    bb_type)\
+                values({0}, "{1}", "{2}", "{3}", "{4}",\
+                    "{5}", "{6}", "{7}", {8}, {9}, {10},\
+                    {11}, {12}, {13}, {14}, {15}, "{16}")'.\
+                    format(
+                        int(tj_dic['id_str']),
+                        tj_dic['place']['id'],
+                        tj_dic['place']['url'],
+                        tj_dic['place']['place_type'],
+                        tj_dic['place']['name'],
+                        tj_dic['place']['full_name'],
+                        tj_dic['place']['country_code'],
+                        tj_dic['place']['country'],
+                        tj_dic['place']['bounding_box']['coordinates'][0][0][0],
+                        tj_dic['place']['bounding_box']['coordinates'][0][0][1],
+                        tj_dic['place']['bounding_box']['coordinates'][0][1][0],
+                        tj_dic['place']['bounding_box']['coordinates'][0][1][1],
+                        tj_dic['place']['bounding_box']['coordinates'][0][2][0],
+                        tj_dic['place']['bounding_box']['coordinates'][0][2][1],
+                        tj_dic['place']['bounding_box']['coordinates'][0][3][0],
+                        tj_dic['place']['bounding_box']['coordinates'][0][3][1],
+                        tj_dic['place']['bounding_box']['type']
+                    )
+            cnx.cmd_query(insert_place)
 
 def load_file(path):
-    api_s = open(path, 'r')
-    j_array = json.loads(api_s.read())
+    api_s = open(path, 'r', encoding='utf-8')
+    jstring = api_s.read()
+    if jstring != "":
+        j_array = json.loads(jstring)
+    else:
+        return
     insert_tweets(j_array)
     cnx.commit()
     insert_users(j_array)
@@ -561,6 +643,8 @@ def load_file(path):
     insert_media(j_array)
     cnx.commit()
     insert_hashtags(j_array)
+    cnx.commit()
+    insert_place(j_array)
 
     cnx.commit()
 
@@ -571,15 +655,15 @@ def initializedb(password):
 
     create_tweets()
     create_users()
+    create_media()
     create_med_size()
     create_enhanced_urls()
     create_hashtags()
-    create_media()
     create_qt_tweet()
     create_rt_tweet()
     create_urls()
     create_users_mentions()
-
+    create_place()
     cnx.commit()
 
 def disconnect():
