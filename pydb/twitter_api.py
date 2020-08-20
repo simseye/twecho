@@ -82,9 +82,13 @@ class TList:
         depth += 1
         if depth > 5: return
         try: 
-            self.get_qt( self.last_tweets_a.append(api.GetStatus(status_id=tj_dic['quoted_status_id']).AsDict()), depth)
+            tweet = api.GetStatus(status_id=qt_id).AsDict()
         except twitter.error.TwitterError:
-            pass 
+            pass
+        if tweet.get('is_quote_status', False):
+            self.get_qt( tweet['quoted_status_id'], depth)
+
+
 def load_files(path):
     files =  os.listdir(path)
 
