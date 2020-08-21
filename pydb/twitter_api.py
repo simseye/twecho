@@ -73,10 +73,11 @@ class TList:
                 print('saved {0} tweets from list {1} at'.format(self.save_mark, self.list_name) + time.ctime() + '\n')
                 self.saved_till = self.last_last_dt
                 self.save_mark = 0
+                self.last_tweets_a = [None for i in range(100)]
         print('save_mark: (' + self.list_name + ') ' +  str(self.save_mark) + '\n')
 
-
-        self.last_last_dt = datetime.strptime(nt_l[-1]['created_at'], '%a %b %d %H:%M:%S %z %Y')
+        if nt_l is no None:
+            self.last_last_dt = datetime.strptime(nt_l[-1]['created_at'], '%a %b %d %H:%M:%S %z %Y')
         
     def get_qt(self, qt_id, depth):
         depth += 1
