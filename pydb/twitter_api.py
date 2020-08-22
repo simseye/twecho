@@ -85,7 +85,8 @@ class TList:
         try: 
             tweet = None
             tweet = api.GetStatus(status_id=qt_id).AsDict()
-        except twitter.error.TwitterError:
+        except twitter.error.TwitterError as err:
+            print(err)
             pass
         if tweet != None and tweet.get('is_quote_status', False):
             self.get_qt( tweet['quoted_status_id'], depth)
