@@ -76,7 +76,7 @@ class TList:
                 self.last_tweets_a = [None for i in range(100)]
         print('save_mark: (' + self.list_name + ') ' +  str(self.save_mark) + '\n')
 
-        if nt_l is not None:
+        if nt_l != []:
             self.last_last_dt = datetime.strptime(nt_l[-1]['created_at'], '%a %b %d %H:%M:%S %z %Y')
         
     def get_qt(self, qt_id, depth):
@@ -97,8 +97,6 @@ def get_list_tls():
 
     for list_name in config['lists']:
         tlists.append(TList(list_name))
-    for tlist in tlists:
-        tlist.api_store_list()
     while 1:
         for tlist in tlists:
             tlist.api_store_list()
