@@ -83,16 +83,12 @@ class TList:
         depth += 1
         if depth > 5: return
         try: 
+            tweet = None
             tweet = api.GetStatus(status_id=qt_id).AsDict()
         except twitter.error.TwitterError:
             pass
-        if tweet.get('is_quote_status', False):
+        if tweet != None and tweet.get('is_quote_status', False):
             self.get_qt( tweet['quoted_status_id'], depth)
-
-
-def load_files(path):
-    files =  os.listdir(path)
-
 
 
 def get_list_tls():
