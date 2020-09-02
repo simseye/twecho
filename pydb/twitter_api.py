@@ -62,7 +62,10 @@ class TList:
             if self.save_mark == 100:
                 for tweet in self.last_tweets_a:
                     if tweet.get('is_quote_status', False):
-                        self.get_qt(tweet['quoted_status_id'], 1)
+                        try:
+                            self.get_qt(int(tweet['quoted_status_id_str']), 1)
+                        except KeyError as e:
+                            print(tweet)
                 st_name = self.saved_till.strftime("%Y-%b-%d_%H%M%S")
                 self.last_last_dt = datetime.strptime(pj_dic['created_at'], '%a %b %d %H:%M:%S %z %Y')
                 last_last_dt_name = self.last_last_dt.strftime("%Y-%b-%d_%H%M%S")
