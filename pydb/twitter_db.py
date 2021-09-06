@@ -240,6 +240,11 @@ def create_place():
                     primary key(tweet_id, id)\
                     )')
                     
+def create_list_tags():
+    cnx.cmd_query('create table if not exists list_tags(\
+                    user_id bigint,\
+                    tag_name varchar(45)\
+                    )')
 
 
 
@@ -325,7 +330,8 @@ def insert_tweets(jarray):
             #     insert_tweet( api.GetStatus(status_id=tj_dic['quoted_status_id']).AsDict(), depth)
             # except TwitterError:
             #     pass
-            insert_qt_tweet(tj_dic['quoted_status_id'], int(tj_dic['id_str']))
+            if tj_dic.get('quoted_status_id', False):
+                insert_qt_tweet(int(tj_dic['quoted_status_id_str']), int(tj_dic['id_str']))
         if tj_dic.get('retweeted_status', None) is not None:
             retweet_id = tj_dic['retweeted_status']['id']
             # insert_tweet(tj_dic['retweeted_status'], 1)
@@ -627,6 +633,20 @@ def insert_place(jarray):
                     )
             cnx.cmd_query(insert_place)
 
+def insert_list_tags(users_dic, list_name):
+    for user in users_dic:
+        qt_tweet_s=\
+            'insert ignore into  list_tags(\
+            user_id ,\
+            tag_name \
+            )\
+            values({0}, "{1}")'.format(
+            user.id if user.id else "NULL",
+            list_name
+            )
+        cnx.cmd_query(qt_tweet_s)
+    cnx.commit()
+
 def load_file(path):
     api_s = open(path, 'r', encoding='utf-8')
     jstring = api_s.read()
@@ -634,6 +654,22 @@ def load_file(path):
         j_array = json.loads(jstring)
     else:
         return
+    insert_tweets(j_array)
+    cnx.commit()
+    insert_users(j_array)
+    cnx.commit()
+    insert_urls(j_array)
+    cnx.commit()
+    insert_media(j_array)
+    cnx.commit()
+    insert_hashtags(j_array)
+    cnx.commit()
+    insert_place(j_array)
+
+    cnx.commit()
+
+def load_json(j_array):
+
     insert_tweets(j_array)
     cnx.commit()
     insert_users(j_array)
@@ -664,6 +700,7 @@ def initializedb(password):
     create_urls()
     create_users_mentions()
     create_place()
+    create_list_tags()
     cnx.commit()
 
 def disconnect():
