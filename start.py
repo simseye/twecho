@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 import twitter
 import json
+import argparse
 
 def create_api_instance():
     """
@@ -45,7 +46,7 @@ def options():
     ap = argparse.ArgumentParser(prog="twitter-archiver",
                                  usage="python3 %(prog)s [options]",
                                  description="Archive tweets from home timeline and lists to mysql")
-    ap.add_argument("-u", "--password", help="password of mysql db")
+    ap.add_argument("-p", "--password", help="password of mysql db")
 
     args = ap.parse_args()
 
