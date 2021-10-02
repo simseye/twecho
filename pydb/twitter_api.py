@@ -8,6 +8,7 @@ from collections import  deque
 from datetime import datetime
 from . import twitter_db
 from pathlib import Path
+import sched
 class TList:
 
 
@@ -44,11 +45,11 @@ class TList:
         new_tweets = []
         try:
             if(self.list_name == "home"):
-                new_tweets = self.api.GetHomeTimeline(count=200)
+                new_tweets = self.api.GetHomeTimeline(count=60)
                 new_tweets = [tweet._json for tweet in new_tweets]
             else:
                 new_tweets = self.api.GetListTimeline(owner_screen_name=self.config['owner_screen_name'], list_id=self.list.id, include_rts=True,
-                                         count=200, return_json=True)
+                                         count=60, return_json=True)
         except requests.exceptions.ConnectionError as err:
             print(err)
             print('error handeled')
@@ -66,7 +67,7 @@ class TList:
 
         print("new_tbs size : {0}".format(len(new_tbs)))
         if len(new_tbs) > 100:
-            print("new_tbs large({0}) at index {1} in nt_l:".format(len(new_tbs), new_last_index))
+            print("100 limit exceeded, new_tbs large({0}) at index {1} in nt_l:".format(len(new_tbs), new_last_index))
             for i, t in enumerate(nt_l):
                 print('{0} {1} \n'.format(i, t['created_at']))
         # print('new ones:(' + self.list_name + ') \n')
@@ -112,26 +113,89 @@ class TList:
             self.get_qt( tweet['quoted_status_id'], depth)
 
 
-def get_list_tls(api, config, destination_p, db_password):
+def get_list_tls(api, config, destination_p, users, destination_u):
     tlists = []
-    twitter_db.initializedb(db_password)
     lists = api.GetLists()
     list_ids = [list.id for list in lists]
-    for list in lists:
+    all_list_members = []
+    for twitter_list in lists:
         
         list_members = api.GetListMembers(owner_screen_name=config['owner_screen_name'],
-                                         list_id=list.id)
-        twitter_db.insert_list_tags(list_members, list.name)
+                                         list_id=twitter_list.id)
+        twitter_db.insert_list_tags(list_members, twitter_list.name)
+        list_members_names = [member.screen_name for member in list_members]
+        all_list_members += list_members_names
 
-    for list in lists:
-        if list.name in config['lists']:
-            tlists.append(TList(list, api,config, destination_p))
+    for twitter_list in lists:
+        if twitter_list.name in config['lists']:
+            tlists.append(TList(twitter_list, api,config, destination_p))
 
+    get_lists(tlists)
+    user_win_start = time.time()
+    all_list_members_chunks = chunks(all_list_members, 100)
+    n_loops = 0
     while 1:
-        for tlist in tlists:
-            new_tweets = tlist.api_store_list()
-            # if new_tweets != None:
-            #     twitter_db.load_json(new_tweets)
-        print('checked at' + time.ctime())
-        time.sleep(600)
+        wait_sec = 60
+        if(len(users)> 0):
+            get_user_timeline(api, None, users)
+        get_lists(tlists)
+        if(time.time() > user_win_start):
+            while 1:
+                n_loops += 1
+                if(n_loops < 9):
+                    try:
+                        get_user_timeline(api, None, next(all_list_members_chunks))
+                    except StopIteration:
+                        all_list_members_chunks = chunks(all_list_members, 100)
+                
+                else:
+                    n_loops = 0
+                    user_win_start += 900
+                    wait_sec = 0
+                    break
+                if(n_loops % 2 == 0):
+                    wait_sec = 0
+                    break
 
+        time.sleep(wait_sec)
+
+
+def get_lists(tlists):
+    
+    for tlist in tlists:
+        new_tweets = tlist.api_store_list()
+        # if new_tweets != None:
+        #     twitter_db.load_json(new_tweets)
+    print('checked at' + time.ctime())
+    # get_user_timeline(api, destination_u, users)
+
+    # time.sleep(600)
+
+
+def get_user_timeline(api, destination, users):
+
+    for user in users:
+        # dt_name = datetime.now().strftime("%Y-%b-%d_%H%M%S" + ".json")
+
+        try:
+            user_tweets = api.GetUserTimeline(screen_name = user, count = 50)
+            user_tweets_dic = [tweet._json for tweet in user_tweets]
+            # with open(Path.joinpath(destination,  user + "_"+ dt_name ), 'w') as f:
+            #     f.write(json.dumps(user_tweets_dic))
+            twitter_db.load_user_json(user_tweets_dic)
+        except requests.exceptions.ConnectionError as err:
+            print(err)
+            print('connection error handeled at user timelines')
+        except twitter.error.TwitterError as err:
+            print("error at user: {0}".format(user) + '\n')
+            print(err)
+            print('twitter error handeled at user timelines')
+
+
+
+def initialize_db(db_args):
+    twitter_db.initializedb(db_args)
+
+def chunks(lst, n):
+    for i in range(0, len(lst), n):
+        yield lst[i:i+n]

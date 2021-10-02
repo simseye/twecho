@@ -1,5 +1,10 @@
+.*
+!/.gitignore
+*.pyc
+pydb_config.json
 pydb_config.txt
 start_db.py
 pydb_config2.txt
 newtokens.py
 lists_json.py
+start.ps1

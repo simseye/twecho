@@ -25,7 +25,7 @@ def create_tweets():
     cnx.cmd_query('create table if not exists tweets(\
                created_at datetime,\
                id bigint,\
-               text varchar(300) character set utf8mb4 ,\
+               text varchar(500) character set utf8mb4 ,\
                truncated bool,\
                screen_name varchar(15) character set utf8mb4,\
                retweet_count int,\
@@ -38,10 +38,12 @@ def create_tweets():
                in_reply_to_screen_name varchar(15),\
                coordinates_long decimal(9,7),\
                coordinates_lat decimal(9,7),\
+               place_full_name varchar(40),\
+               place_country varchar(60),\
                is_quote_status bool,\
                quoted_status_id bigint,\
                quoted_status varchar(280),\
-               rewteeted_id bigint,\
+               retweeted_id bigint,\
                favorited bool,\
                retweeted bool,\
                lang varchar(6),\
@@ -200,11 +202,11 @@ def create_hashtags():
 
 def create_rt_tweet():
     cnx.cmd_query('create table if not exists rt_tweet(\
-                   retweet_id bigint,\
                    tweet_id bigint,\
+                   retweet_id bigint,\
                    foreign key(tweet_id) references tweets(id),\
                    foreign key(retweet_id) references tweets(id),\
-                   primary key(retweet_id, tweet_id)\
+                   primary key(tweet_id, retweet_id)\
                    )')
 
 
@@ -260,9 +262,11 @@ def insert_tweets(jarray):
             irtsn = "NULL"
 
         if tj_dic.get('place', None):
-            place = '"' + str(tj_dic['place']) + '"'
+            place_full_name = '"' + str(tj_dic['place']['full_name']) + '"'
+            place_country = '"' + str(tj_dic['place']['country']) + '"'
         else:
-            place = "NULL"
+            place_full_name = "NULL"
+            place_country = "NULL"
 
         if tj_dic.get('coordinates', None):
             coords_long = tj_dic['coordinates']['coordinates'][0] 
@@ -275,6 +279,10 @@ def insert_tweets(jarray):
             source= '"' + str(tj_dic['source'].replace('"', '\\"')) + '"'
         else:
             source = "NULL"
+        if tj_dic.get("retweeted_status", None):
+            retweeted_id = int(tj_dic["retweeted_status"]["id_str"])
+        else:
+            retweeted_id = "NULL"
 
         insert_string = ''
         insert_string = \
@@ -292,17 +300,20 @@ def insert_tweets(jarray):
             in_reply_to_screen_name ,\
             coordinates_long ,\
             coordinates_lat,\
+            place_full_name,\
+            place_country,\
             is_quote_status,\
             quoted_status_id,\
+            retweeted_id,\
             favorited ,\
             retweeted ,\
             lang, \
             reply_count )\
             values("{0}", {1}, "{2}", "{3}", {4},\
-            {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14}, {15}, {16}, "{17}", {18})'.format(
+            {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14}, {15}, {16}, {17}, {18}, {19}, "{20}", {21})'.format(
                 ddb_dt,
                 int(tj_dic['id_str']),
-                tj_dic['text'].replace('"', '\\"'),
+                tj_dic['full_text'].replace('\\', '\\\\').replace('"', '\\"'),
                 tj_dic['user']['screen_name'].replace('"', '\\"'),
                 tj_dic.get('retweet_count', "NULL"),
                 tj_dic.get('favorite_count', "NULL"),
@@ -313,8 +324,158 @@ def insert_tweets(jarray):
                 irtsn,
                 coords_long,
                 coords_lat,
+                place_full_name,
+                place_country,
                 tj_dic.get('is_quote_status', "NULL"),
                 tj_dic.get('quoted_status_id', "NULL"),
+                retweeted_id,
+                tj_dic.get('favorited', "NULL"),
+                tj_dic.get('retweeted', "NULL"),
+                tj_dic['lang'],
+                tj_dic.get('reply_count', "NULL")
+            )
+        cnx.cmd_query(insert_string)
+
+        if  tj_dic.get('is_quote_status', None):
+            # depth += 1
+            # if depth > 5: return
+            # try:
+
+            #     insert_tweet( api.GetStatus(status_id=tj_dic['quoted_status_id']).AsDict(), depth)
+            # except TwitterError:
+            #     pass
+            if tj_dic.get('quoted_status_id', False):
+                insert_qt_tweet(int(tj_dic['quoted_status_id_str']), int(tj_dic['id_str']))
+        # if tj_dic.get('retweeted_status', None) is not None:
+        #     retweet_id = int(tj_dic['retweeted_status']['id_str'])
+        #     # insert_tweet(tj_dic['retweeted_status'], 1)
+        #     insert_rt_tweet(retweet_id, int(tj_dic['id_str']))
+        #     # cnx.commit()
+
+def ins_update_tweets(jarray):
+    for tj_dic in jarray:
+        tweet_dt = datetime.strptime(tj_dic['created_at'], '%a %b %d %H:%M:%S %z %Y')
+        ddb_dt = tweet_dt.strftime("%Y-%b-%d %H:%M:%S")
+        ddb_dt = ddb_dt[:5] + str(tweet_dt.month) + ddb_dt[8:]
+
+        if tj_dic.get('in_reply_to_screen_name', None):
+            irtsn = '"' + str(tj_dic['in_reply_to_screen_name'].replace('"', '\\"')) + '"'
+        else:
+            irtsn = "NULL"
+
+        if tj_dic.get('place', None):
+            place_full_name = '"' + str(tj_dic['place']['full_name']) + '"'
+            place_country = '"' + str(tj_dic['place']['country']) + '"'
+        else:
+            place_full_name = "NULL"
+            place_country = "NULL"
+
+        if tj_dic.get('coordinates', None):
+            coords_long = tj_dic['coordinates']['coordinates'][0] 
+            coords_lat = tj_dic['coordinates']['coordinates'][1] 
+        else:
+            coords_long = "NULL"
+            coords_lat = "NULL"
+
+        if tj_dic.get('source', None):
+            source= '"' + str(tj_dic['source'].replace('"', '\\"')) + '"'
+        else:
+            source = "NULL"
+        if tj_dic.get("retweeted_status", None):
+            retweeted_id = int(tj_dic["retweeted_status"]["id_str"])
+        else:
+            retweeted_id = "NULL"
+
+        insert_string = ''
+        insert_string = \
+            'insert into tweets (\
+            created_at,\
+            id,\
+            text,\
+            screen_name,\
+            retweet_count,\
+            favorite_count ,\
+            source ,\
+            user_id ,\
+            in_reply_to_status_id,\
+            in_reply_to_user_id ,\
+            in_reply_to_screen_name ,\
+            coordinates_long ,\
+            coordinates_lat,\
+            palce_full_name,\
+            place_country,\
+            is_quote_status,\
+            quoted_status_id,\
+            retweeted_id,\
+            favorited ,\
+            retweeted ,\
+            lang, \
+            reply_count )\
+            values("{0}", {1}, "{2}", "{3}", {4},\
+            {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14}, {15}, {16}, {17}, {18}, {19}, "{20}", {21})\
+            on duplicate key update \
+            created_at="{22}",\
+            id={23},\
+            text="{24}",\
+            screen_name="{25}",\
+            retweet_count={26},\
+            favorite_count={27} ,\
+            source = {28},\
+            user_id ={29},\
+            in_reply_to_status_id ={30},\
+            in_reply_to_user_id ={31},\
+            in_reply_to_screen_name ={32},\
+            coordinates_long ={33},\
+            coordinates_lat ={34},\
+            place_full_name={35},\
+            place_country={36},\
+            is_quote_status={37},\
+            quoted_status_id={38},\
+            retweeted_id={39},\
+            favorited ={40},\
+            retweeted ={41},\
+            lang ="{42}", \
+            reply_count ={43}'.format(
+                ddb_dt,
+                int(tj_dic['id_str']),
+                tj_dic['full_text'].replace('"', '\\"'),
+                tj_dic['user']['screen_name'].replace('"', '\\"'),
+                tj_dic.get('retweet_count', "NULL"),
+                tj_dic.get('favorite_count', "NULL"),
+                source,
+                tj_dic['user']['id'],
+                tj_dic.get('in_reply_to_status_id', None) if tj_dic.get('in_reply_to_status_id', None) else "NULL",
+                tj_dic.get('in_reply_to_user_id', None) if tj_dic.get('in_reply_to_user_id', None) else "NULL",
+                irtsn,
+                coords_long,
+                coords_lat,
+                place_full_name,
+                place_country,
+                tj_dic.get('is_quote_status', "NULL"),
+                tj_dic.get('quoted_status_id', "NULL"),
+                retweeted_id,
+                tj_dic.get('favorited', "NULL"),
+                tj_dic.get('retweeted', "NULL"),
+                tj_dic['lang'],
+                tj_dic.get('reply_count', "NULL"),
+                ddb_dt,
+                int(tj_dic['id_str']),
+                tj_dic['full_text'].replace('"', '\\"'),
+                tj_dic['user']['screen_name'].replace('"', '\\"'),
+                tj_dic.get('retweet_count', "NULL"),
+                tj_dic.get('favorite_count', "NULL"),
+                source,
+                tj_dic['user']['id'],
+                tj_dic.get('in_reply_to_status_id', None) if tj_dic.get('in_reply_to_status_id', None) else "NULL",
+                tj_dic.get('in_reply_to_user_id', None) if tj_dic.get('in_reply_to_user_id', None) else "NULL",
+                irtsn,
+                coords_long,
+                coords_lat,
+                place_full_name,
+                place_country,
+                tj_dic.get('is_quote_status', "NULL"),
+                tj_dic.get('quoted_status_id', "NULL"),
+                retweeted_id,
                 tj_dic.get('favorited', "NULL"),
                 tj_dic.get('retweeted', "NULL"),
                 tj_dic['lang'],
@@ -333,9 +494,10 @@ def insert_tweets(jarray):
             if tj_dic.get('quoted_status_id', False):
                 insert_qt_tweet(int(tj_dic['quoted_status_id_str']), int(tj_dic['id_str']))
         if tj_dic.get('retweeted_status', None) is not None:
-            retweet_id = tj_dic['retweeted_status']['id']
+            retweet_id = int(tj_dic['retweeted_status']['id_str'])
             # insert_tweet(tj_dic['retweeted_status'], 1)
             insert_rt_tweet(retweet_id, int(tj_dic['id_str']))
+            # cnx.commit()
 
 def insert_users(jarray):
     for  tj_dic in jarray:
@@ -431,7 +593,100 @@ def insert_users(jarray):
 
         cnx.cmd_query( instr_user)
 
+def insert_users(jarray):
+    for  tj_dic in jarray:
+        tweet_dtu = datetime.strptime(tj_dic['created_at'], '%a %b %d %H:%M:%S %z %Y' )
+        ddb_dtu = tweet_dtu.strftime("%Y-%b-%d %H:%M:%S")
+        ddb_dtu = ddb_dtu[:5] +  str(tweet_dtu.month) + ddb_dtu[8:]
+        instr_user= \
+            'insert ignore into  users(\
+               created_at ,\
+               id ,\
+               name ,\
+               screen_name ,\
+               location ,\
+               description ,\
+               url ,\
+               protected ,\
+               followers_count ,\
+               friends_count ,\
+               favourites_count ,\
+               utc_offset ,\
+               geo_enabled ,\
+               time_zone ,\
+               verified ,\
+               statuses_count ,\
+               lang ,\
+               contributors_enabled ,\
+               is_translator ,\
+               is_translation_enabled ,\
+               profile_background_color ,\
+               profile_background_image_url ,\
+               profile_background_image_url_https ,\
+               profile_background_tile ,\
+               profile_image_url ,\
+               profile_image_url_https ,\
+               profile_banner_url ,\
+               profile_link_color ,\
+               profile_sidebar_border_color ,\
+               profile_sidebar_fill_color ,\
+               profile_text_color ,\
+               profile_use_background_image ,\
+               has_extended_profile ,\
+               default_profile ,\
+               default_profile_image ,\
+               following ,\
+               follow_request_sent ,\
+               notifications ,\
+               translator_type)\
+           values( "{0}", "{1}", "{2}", "{3}", "{4}", "{5}", "{6}", {7}, {8}, {9}, {10},\
+            {11}, {12}, {13}, {14}, {15}, "{16}", {17}, {18}, {19}, "{20}", "{21}",\
+             "{22}", {23}, "{24}", "{25}", "{26}", "{27}", "{28}", "{29}", "{30}", {31}, {32},\
+              {33}, {34}, {35}, {36}, {37}, "{38}")'.format(
+                ddb_dtu,
+                tj_dic['user']['id'] if tj_dic['user']['id'] else "NULL",
+                tj_dic['user']['name'].replace('"', '\\"') if tj_dic['user']['name'].replace('"', '\\"') else "NULL",
+                tj_dic['user']['screen_name'].replace('"', '\\"') if tj_dic['user']['screen_name'].replace('"', '\\"') else "NULL",
+                tj_dic['user']['location'].replace('"', '\\"') if tj_dic['user']['location'] else "NULL",
+                # need to parameterize all queries to avoid any special characters causing trouble.
+                tj_dic['user']['description'].replace('\\', '\\\\').replace('"', '\\"') if tj_dic['user']['description'] else "NULL",
+                tj_dic['user']['url'] if tj_dic['user']['url'] else "NULL",
+                tj_dic['user']['protected'] if tj_dic['user']['protected'] else "NULL",
+                tj_dic['user']['followers_count'] if tj_dic['user']['followers_count'] else "NULL",
+                tj_dic['user']['friends_count'] if tj_dic['user']['friends_count'] else "NULL",
+                tj_dic['user']['favourites_count'] if tj_dic['user']['favourites_count'] else "NULL",
+                tj_dic['user']['utc_offset'] if tj_dic['user']['utc_offset'] else "NULL",
+                tj_dic['user']['geo_enabled'] if tj_dic['user']['geo_enabled'] else "NULL",
+                tj_dic['user']['time_zone'] if tj_dic['user']['time_zone'] else "NULL",
+                tj_dic['user']['verified'] if tj_dic['user']['verified'] else "NULL",
+                tj_dic['user']['statuses_count'] if tj_dic['user']['statuses_count'] else "NULL",
+                tj_dic['user']['lang'] if tj_dic['user']['lang'] else "NULL",
+                tj_dic['user']['contributors_enabled'] if tj_dic['user']['contributors_enabled'] else "NULL",
+                tj_dic['user']['is_translator'] if tj_dic['user']['is_translator'] else "NULL",
+                tj_dic['user']['is_translation_enabled'] if tj_dic['user']['is_translation_enabled'] else "NULL",
+                tj_dic['user']['profile_background_color'] if tj_dic['user']['profile_background_color'] else "NULL",
+                tj_dic['user']['profile_background_image_url'] if tj_dic['user']['profile_background_image_url'] else "NULL",
+                tj_dic['user']['profile_background_image_url_https'] if tj_dic['user'][
+                    'profile_background_image_url_https'] else "NULL",
+                tj_dic['user']['profile_background_tile'] if tj_dic['user']['profile_background_tile'] else "NULL",
+                tj_dic['user']['profile_image_url'] if tj_dic['user']['profile_image_url'] else "NULL",
+                tj_dic['user']['profile_image_url_https'] if tj_dic['user']['profile_image_url_https'] else "NULL",
+                tj_dic['user'].get('profile_banner_url', "NULL"),
+                tj_dic['user']['profile_link_color'] if tj_dic['user']['profile_link_color'] else "NULL",
+                tj_dic['user']['profile_sidebar_border_color'] if tj_dic['user']['profile_sidebar_border_color'] else "NULL",
+                tj_dic['user']['profile_sidebar_fill_color'] if tj_dic['user']['profile_sidebar_fill_color'] else "NULL",
+                tj_dic['user']['profile_text_color'] if tj_dic['user']['profile_text_color'] else "NULL",
+                tj_dic['user']['profile_use_background_image'] if tj_dic['user']['profile_use_background_image'] else "NULL",
+                tj_dic['user']['has_extended_profile'] if tj_dic['user']['has_extended_profile'] else "NULL",
+                tj_dic['user']['default_profile'] if tj_dic['user']['default_profile'] else "NULL",
+                tj_dic['user']['default_profile_image'] if tj_dic['user']['default_profile_image'] else "NULL",
+                tj_dic['user']['following'] if tj_dic['user']['following'] else "NULL",
+                tj_dic['user']['follow_request_sent'] if tj_dic['user']['follow_request_sent'] else "NULL",
+                tj_dic['user']['notifications'] if tj_dic['user']['notifications'] else "NULL",
+                tj_dic['user']['translator_type'] if tj_dic['user']['translator_type'] else "NULL"
+            )
 
+        cnx.cmd_query( instr_user)
 def insert_urls(jarray):
     for i, tj_dic in enumerate(jarray):
         for url in tj_dic['entities']['urls']:
@@ -566,14 +821,25 @@ def insert_hashtags(jarray):
 def insert_rt_tweet(rt_id, t_id):
     rt_tweet_s=\
         'insert ignore into  rt_tweet(\
-        retweet_id ,\
-        tweet_id \
+        tweet_id ,\
+        retweet_id \
         )\
         values({0}, {1})'.format(
-        rt_id,
-        t_id
+        t_id,
+        rt_id
         )
     cnx.cmd_query(rt_tweet_s)
+
+
+def insert_rt_tweets(jarray):
+    for i, tj_dic in enumerate(jarray):
+
+        if tj_dic.get('retweeted_status', None) is not None:
+            retweet_id = int(tj_dic['retweeted_status']['id_str'])
+            insert_tweets([tj_dic['retweeted_status']])
+            insert_rt_tweet(retweet_id, int(tj_dic['id_str']))
+            insert_users([tj_dic['retweeted_status']])
+
 
 def insert_qt_tweet(qt_id, t_id):
     qt_tweet_s=\
@@ -665,7 +931,8 @@ def load_file(path):
     insert_hashtags(j_array)
     cnx.commit()
     insert_place(j_array)
-
+    cnx.commit()
+    insert_rt_tweets()
     cnx.commit()
 
 def load_json(j_array):
@@ -681,12 +948,54 @@ def load_json(j_array):
     insert_hashtags(j_array)
     cnx.commit()
     insert_place(j_array)
-
+    cnx.commit()
+    insert_rt_tweets(j_array)
     cnx.commit()
 
-def initializedb(password):
+def load_user_json(j_array):
+    if(len(j_array) == 0):
+        return
+    cursor.execute("select * from tweets where id = {0}".format(j_array[0]['id_str']))
+    result = cursor.fetchall()
+    if(len(result) != 0):
+        return
+    insert_tweets(j_array)
+    cnx.commit()
+    insert_users(j_array)
+    cnx.commit()
+    insert_urls(j_array)
+    cnx.commit()
+    insert_media(j_array)
+    cnx.commit()
+    insert_hashtags(j_array)
+    cnx.commit()
+    insert_place(j_array)
+    cnx.commit()
+    insert_rt_tweets(j_array)
+    cnx.commit()
+
+def load_json_update(j_array):
+
+    ins_update_tweets(j_array)
+    cnx.commit()
+    insert_users(j_array)
+    cnx.commit()
+    insert_urls(j_array)
+    cnx.commit()
+    insert_media(j_array)
+    cnx.commit()
+    insert_hashtags(j_array)
+    cnx.commit()
+    insert_place(j_array)
+    cnx.commit()
+    insert_rt_tweets(j_array)
+    cnx.commit()
+
+def initializedb(db_args):
     global cnx
-    cnx = mysql.connector.connect(user='root', passwd=password, host='127.1.1.1', database='twitterapi', charset='utf8mb4')
+    global cursor
+    # connect args -> user=user, passwd=password, host=host, database=database_name, charset='utf8mb4'
+    cnx = mysql.connector.connect(**db_args)
     cursor = cnx.cursor(buffered=True)
 
     create_tweets()
