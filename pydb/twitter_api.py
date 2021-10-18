@@ -214,22 +214,25 @@ def get_list_tls( config, destination_p, users, destination_u):
             tlists.append(TList(twitter_list, config, destination_p))
 
     get_lists(tlists)
-    get_user_timeline( None, users, 1, 10)
+    get_user_timeline( None, users, 1, 10, False)
 
     user_win_start = time.time()
     all_list_members_chunks = chunks(all_list_members, 3)
     n_loops = 0
     while 1:
         wait_sec = 60
+        user_batch = []
         if(len(users)> 0):
-            get_user_timeline( None, users, 1, 5)
+            get_user_timeline( None, users, 1, 5, False)
         get_lists(tlists)
         if(time.time() > user_win_start):
             while 1:
-                n_loops += 1
                 if(n_loops < 9):
                     try:
-                        get_user_timeline( None, next(all_list_members_chunks), 33, 100)
+                        if len(user_batch) == 0:
+                            user_batch = next(all_list_members_chunks) 
+                            n_loops += 1
+                        get_user_timeline( None, user_batch, 33, 100, True)
                     except StopIteration:
                         all_list_members_chunks = chunks(all_list_members, 100)
                 
@@ -246,7 +249,7 @@ def get_list_tls( config, destination_p, users, destination_u):
 
 
 def get_list_tls2(config, destination_p, users, destination_u):
-    get_user_timeline( None, users, 1, 10)
+    get_user_timeline( None, users, 1, 10, False)
 
 
 def get_lists(tlists):
@@ -261,9 +264,9 @@ def get_lists(tlists):
     # time.sleep(600)
 
 
-def get_user_timeline( destination, users, range_num, max_results):
+def get_user_timeline( destination, users, range_num, max_results, check_previous):
     
-    for user in users:
+    for user in list(users):
         
         # try:
         #     max_id = None
@@ -289,10 +292,6 @@ def get_user_timeline( destination, users, range_num, max_results):
         # print(user_tweets[0])
 
 
-        # dt_name = datetime.now().strftime("%Y-%b-%d_%H%M%S" + ".json")
-        # tweet = s.apiv2.get_tweet(id = 1446736600889659397, media_fields = s.media_fields,  place_fields = s.place_fields,
-        #                                 tweet_fields =  s.tweet_fields, user_fields = s.user_fields,
-        #                                 expansions=s.expansions)
 
         try:
             if(user.get('id_str') is None):
@@ -314,8 +313,9 @@ def get_user_timeline( destination, users, range_num, max_results):
             s.db.cursor.execute(f"select count(*) from tweets\
                 where author_id = {id}")
             tweet_count = s.db.cursor.fetchone()[0]
-            if tweet_count >= 3200 or tweet_count >= user_obj['data']['public_metrics']['tweet_count']:
-                continue
+            if check_previous:
+                if tweet_count >= 3200 or tweet_count >= user_obj['data']['public_metrics']['tweet_count']:
+                    continue
             for i in range(range_num):
                 response = s.apiv2.get_users_tweets(id = id, max_results = max_results,
                                         pagination_token = p_token,
@@ -335,7 +335,7 @@ def get_user_timeline( destination, users, range_num, max_results):
                 if user_tweets['meta'].get('next_token'):
                     p_token = user_tweets['meta']['next_token']
                 else: break
-
+            users.remove(user)
         except requests.exceptions.ConnectionError as err:
             print(err)
             print('connection error handeled at user timelines')
