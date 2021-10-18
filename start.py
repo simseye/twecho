@@ -10,12 +10,31 @@ from pydb import settings as s
 
 def create_api_instance():
     """
-    json format: '[{"lists": [],
-                    "auth": {"CONSUMER_KEY" : "",
-                             "CONSUMER_SECRET":  "",
-                             "ACCESS_TOKEN": "",
-                             "ACCESS_TOKEN_SECRET": ""},
-                    "owner_screen_name": ""}]'
+    json format: {
+        "lists": [
+        ],
+        "auth": {
+            "CONSUMER_KEY": "",
+            "CONSUMER_SECRET": "",
+            "ACCESS_TOKEN": "",
+            "ACCESS_TOKEN_SECRET": "",
+            "BEARER_TOKEN": ""
+        },
+        "owner_screen_name": "",
+        "db_server": "postgres or mysql",
+        "db_args": {
+            "db_user": "",
+            "db_password": "",
+            "db_host": ""
+        },
+        "users_track": [
+
+            {
+                "screen_name": "",
+                "id_str": ""
+            }
+        ]
+    }
     
     save json in config file as pydb_config.txt in root folder
     """
