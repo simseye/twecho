@@ -1,5 +1,6 @@
-# Twitter-Archiver
+## twecho
 
+Store tweets in a database. View and search offline.
 requires: 
 * python-twitter
 * mysql

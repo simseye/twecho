@@ -2,6 +2,8 @@
 !/.gitignore
 *.pyc
 pydb_config.json
+pydb_config2.json
+pydb_config3.json
 pydb_config.txt
 start_db.py
 pydb_config2.txt

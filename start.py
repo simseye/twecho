@@ -1,13 +1,12 @@
 #! /usr/bin/env python
-from pydb import twitter_api
+from pydb import twitter_api, utilities
 # import GetOldTweets3 as got
-from pydb import twitter_db
-import shutil
 from pathlib import Path
 import twitter
 import json
 import argparse
 import os
+from pydb import settings as s
 
 def create_api_instance():
     """
@@ -61,60 +60,33 @@ def options():
 
     return args
 
-def db_args_mysql(args, config):
-    db_args = {}
-    if(args.password):
-        db_args['passwd'] = args.password
-    elif(config.get("db_args") is not None):
-        if(config.get('db_args').get('db_password')):
-            db_args['passwd'] = config['db_args']["db_password"]
-
-    if(args.db_username):
-        db_args['user'] = args.db_user
-    elif(config.get("db_args").get('db_user') is not None):
-        db_args['user'] = config['db_args']["db_user"]
-
-    if(args.db_host):
-        db_args['host'] = args.db_host
-    elif(config.get('db_args').get('db_host') is not None):
-        db_args['host'] = config['db_args']["db_host"]
-
-    if(args.db_name):
-        db_args['database'] = args.db_host
-    elif(config.get('db_args').get('db_name') is not None):
-        db_args['database'] = config['db_args']["db_name"]
-    else:
-        db_args['database'] = 'twitterapi'
-
-    return db_args
-
 
 def main():
 
     file_path = os.getcwd()
     destination_p = Path.joinpath(Path(file_path).parent, "twitter-data")
     destination_pa = Path.joinpath(Path(file_path).parent, "twitter-archive")
-    path_config =  Path.joinpath(Path(file_path), "pydb_config.json")
+    path_config =  Path.joinpath(Path(file_path), "pydb_config2.json")
     destination_user_tl = Path.joinpath( destination_p , "user-tls")
 
     load_config(path_config, destination_p)
     args = options()
 
-    if(args.db_server):
-        if(args.db_server == 'mysql'):
-           db_args = db_args_mysql(args, config)
-    elif(config.get('db_server', None) is not None):
-        db_args = db_args_mysql(args, config)
-    else:
-        pass
+    s.set_db(args, config)
 
     if(config.get("users_track", None) is not None):
         users = config["users_track"]
     else: users = []
 
-    api = create_api_instance()
-    twitter_api.initialize_db(db_args)
-    twitter_api.get_list_tls(api, config, destination_p, users, destination_user_tl)
+    # api = create_api_instance()
+    s.set_apiv1(config)
+    s.set_apiv2(config)
+    s.db.initialize_db()
+    # utilities.deduplicate_urls()
+    # utilities.check_after_url_dup()
+    # utilities.deduplicate_place()
+    # utilities.clone_lists()
+    twitter_api.get_list_tls( config, destination_p, users, destination_user_tl)
     # twitter_api.get_user_timeline(api, destination_user_tl, users)
 
     # for f in listdir(source_p):
