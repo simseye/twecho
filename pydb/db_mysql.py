@@ -23,7 +23,7 @@ def create_tweets():
                created_at datetime,\
                id bigint,\
                tweet_text text character set utf8mb4 ,\
-               screen_name varchar(15) character set utf8mb4,\
+               screen_name varchar(20) character set utf8mb4,\
                retweet_count int unsigned,\
                favorite_count int unsigned,\
                reply_count int unsigned,\
@@ -32,7 +32,7 @@ def create_tweets():
                author_id bigint,\
                in_reply_to_status_id bigint,\
                in_reply_to_user_id bigint,\
-               in_reply_to_screen_name varchar(15),\
+               in_reply_to_screen_name varchar(20),\
                place_full_name varchar(40),\
                place_country varchar(60),\
                is_quote_status bool,\
@@ -52,11 +52,11 @@ def create_users():
     cnx.cmd_query("create table if not exists users(\
                created_at datetime,\
                id bigint,\
-               name char(50) character set utf8mb4,\
-               screen_name char(15) character set utf8mb4,\
+               name varchar(50) character set utf8mb4,\
+               screen_name varchar(20) character set utf8mb4,\
                location varchar(150) character set utf8mb4,\
                description varchar(280) character set utf8mb4,\
-               url char(50),\
+               url varchar(65),\
                protected bool,\
                followers_count int unsigned,\
                friends_count int unsigned,\
@@ -111,7 +111,7 @@ def create_urls_new():
     cnx.cmd_query('create table if not exists urls_new(\
                      url_name varchar(25) ,\
                      url_short varchar(50),\
-                     expanded_url varchar(2083),\
+                     expanded_url varchar(2500),\
                      display_url varchar(100),\
                      primary key (url_name)\
                      )')
@@ -189,7 +189,7 @@ def create_users_mentions():
                   name varchar(50),\
                   index_begin smallint,\
                   index_end smallint,\
-                  screen_name varchar(15),\
+                  screen_name varchar(20),\
                   id bigint,\
                   primary key (id)\
                   )')
@@ -262,7 +262,7 @@ def create_place_new():
     cnx.cmd_query("create table if not exists place_new(\
                     id varchar(20),\
                     url varchar(100),\
-                    place_type varchar(10),\
+                    place_type varchar(20),\
                     city_name varchar(80),\
                     full_name varchar(100),\
                     country_code char(2),\
@@ -475,11 +475,12 @@ def insert_tweets_v2(tweets):
             lang, \
             reply_count,\
             place_id,\
-            possibly_sensitive )\
+            possibly_sensitive,\
+            conversation_id )\
             values(%s, %s, %s, %s, %s,\
                 %s, %s, %s, %s, %s,\
                 %s, %s, %s, %s, %s,\
-                %s)\
+                %s, %s)\
             on duplicate key update\
             created_at = %s,\
             id = %s,\
@@ -488,7 +489,8 @@ def insert_tweets_v2(tweets):
             favorite_count  = %s,\
             quote_count = %s,\
             author_id = %s ,\
-            reply_count = %s"
+            reply_count = %s,\
+            conversation_id = %s"
         values = (
                 ddb_dt,
                 tweet['id'],
@@ -506,7 +508,7 @@ def insert_tweets_v2(tweets):
                 tweet.get('public_metrics').get('reply_count'),
                 tweet.get('geo').get('place_id') if tweet.get('geo') else None,
                 tweet['possibly_sensitive'],
-
+                tweet['conversation_id'],
                 ddb_dt,
                 tweet['id'],
                 tweet['text'],
@@ -514,7 +516,8 @@ def insert_tweets_v2(tweets):
                 tweet.get('public_metrics').get('favorite_count'),
                 tweet.get('public_metrics').get('quote_count'),
                 tweet['author_id'],
-                tweet.get('public_metrics').get('reply_count')
+                tweet.get('public_metrics').get('reply_count'),
+                tweet['conversation_id']
             )
         cursor.execute(insert_string, values)
 
@@ -704,8 +707,9 @@ def insert_urls_deprecated(jarray):
             url['url'],
             url['expanded_url'],
             url['display_url'])
-
+            
             cursor.execute(url_string, values)
+
 
             url_tid_string =\
             "insert ignore into  urls_tid( \
@@ -842,6 +846,7 @@ def insert_media(jarray):
                 media.get('expanded_url'),
                 media['display_url']
                 )
+            
             cursor.execute(media_string, values)
 
             media_tid_string =\

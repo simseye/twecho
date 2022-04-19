@@ -9,7 +9,7 @@ def create_tweets():
                created_at timestamp,\
                id bigint ,\
                tweet_text text  ,\
-               screen_name varchar(15) ,\
+               screen_name varchar(20) ,\
                retweet_count int ,\
                favorite_count int ,\
                reply_count int ,\
@@ -18,7 +18,7 @@ def create_tweets():
                author_id bigint,\
                in_reply_to_status_id bigint ,\
                in_reply_to_user_id bigint ,\
-               in_reply_to_screen_name varchar(15),\
+               in_reply_to_screen_name varchar(20),\
                place_full_name varchar(40),\
                place_country varchar(60),\
                is_quote_status bool,\
@@ -38,11 +38,11 @@ def create_users():
     cursor.execute("create table if not exists users(\
                created_at timestamp,\
                id bigint ,\
-               name char(50) ,\
-               screen_name char(15) ,\
+               name varchar(50) ,\
+               screen_name varchar(20) ,\
                location varchar(150) ,\
                description varchar(280) ,\
-               url char(50),\
+               url varchar(65),\
                protected bool,\
                followers_count int ,\
                friends_count int ,\
@@ -97,7 +97,7 @@ def create_urls_new():
     cursor.execute('create table if not exists urls_new(\
                      url_name varchar(25) ,\
                      url_short varchar(50),\
-                     expanded_url varchar(2083),\
+                     expanded_url varchar(2500),\
                      display_url varchar(100),\
                      primary key (url_name)\
                      )')
@@ -174,7 +174,7 @@ def create_users_mentions():
                   name varchar(50),\
                   index_begin smallint,\
                   index_end smallint,\
-                  screen_name varchar(15),\
+                  screen_name varchar(20),\
                   id bigint ,\
                   primary key (id)\
                   )')
@@ -247,7 +247,7 @@ def create_place_new():
     cursor.execute("create table if not exists place_new(\
                     id varchar(20),\
                     url varchar(100),\
-                    place_type varchar(10),\
+                    place_type varchar(20),\
                     city_name varchar(80),\
                     full_name varchar(100),\
                     country_code char(2),\
@@ -406,8 +406,12 @@ def insert_tweets(jarray):
                 tj_dic.get('retweeted'),
                 tj_dic.get('reply_count')
             )
-        cursor.execute(insert_string, values)
-
+        try:
+            cursor.execute(insert_string, values)
+        except psycopg2.errors.StringDataRightTruncation as err:
+                print(f"expanded_url: {tj_dic['user']['screen_name']}\n\
+                tweet: {tj_dic} \n" + str(err))
+                exit()
         # if  tj_dic.get('is_quote_status', None):
             # depth += 1
             # if depth > 5: return
@@ -461,21 +465,22 @@ def insert_tweets_v2(tweets):
             lang, \
             reply_count,\
             place_id,\
-            possibly_sensitive )\
+            possibly_sensitive,\
+            conversation_id )\
             values(%s, %s, %s, %s, %s,\
                 %s, %s, %s, %s, %s,\
                 %s, %s, %s, %s, %s,\
-                %s, %s)\
+                %s, %s, %s)\
             on conflict(id) do update set \
             created_at = %s,\
             id = %s,\
             tweet_text = %s,\
-            screen_name = %s,\
             retweet_count = %s,\
             favorite_count  = %s,\
             quote_count = %s,\
             author_id = %s ,\
-            reply_count = %s"
+            reply_count = %s,\
+            conversation_id = %s"
         values = (
                 ddb_dt,
                 tweet['id'],
@@ -494,18 +499,24 @@ def insert_tweets_v2(tweets):
                 tweet.get('public_metrics').get('reply_count'),
                 tweet.get('geo').get('place_id') if tweet.get('geo') else None,
                 tweet['possibly_sensitive'],
+                tweet['conversation_id'],
 
                 ddb_dt,
                 tweet['id'],
                 tweet['text'],
-                tweet.get('username'),
                 tweet.get('public_metrics').get('retweet_count'),
                 tweet.get('public_metrics').get('favorite_count'),
                 tweet.get('public_metrics').get('quote_count'),
                 tweet['author_id'],
-                tweet.get('public_metrics').get('reply_count')
+                tweet.get('public_metrics').get('reply_count'),
+                tweet['conversation_id']
             )
-        cursor.execute(insert_string, values)
+        try:
+            cursor.execute(insert_string, values)
+        except psycopg2.errors.StringDataRightTruncation as err:
+                print(f"expanded_url: {tweet['screen_name']}\n\
+                tweet: {tweet} \n" + str(err))
+                exit()
 
 
 
@@ -668,8 +679,12 @@ def insert_users_v2(includes):
             user['profile_image_url'] ,
         )
 
-        cursor.execute( instr_user, values)
-
+        try:
+            cursor.execute(instr_user, values)
+        except psycopg2.errors.StringDataRightTruncation as err:
+                print(f"expanded_url: {user['screen_name']}\n\
+                tweet: {user} \n" + str(err))
+                exit()
 
 def insert_urls_deprecated(jarray):
     """
@@ -725,9 +740,12 @@ def insert_urls_new(tweets):
             url['url'],
             url['expanded_url'],
             url['display_url'])
-
-            cursor.execute(url_string, values)
-
+            try:
+                cursor.execute(url_string, values)
+            except psycopg2.errors.StringDataRightTruncation as err:
+                print(f"expanded_url: {url['expanded_url']}\n\
+                    tweet: {tweet} \n" + str(err))
+                exit()
             url_tid_string =\
             "insert  into urls_tid_new( \
             tweet_id, \
@@ -813,7 +831,6 @@ def insert_media(jarray):
                 media['id']
             )
             cursor.execute(media_tid_string, values)
-
 
             med_size_string =\
                 "insert into  media_size(\
@@ -1383,9 +1400,9 @@ def connect_db(db_name = None):
     try:
         conn = psycopg2.connect( database= db_name, **s.db_args)
     except psycopg2.OperationalError as e:
-        print("psycopg2 OperationalError: " +e)
+        print("psycopg2 OperationalError: " + str(e))
     except psycopg2.ProgrammingError as e:
-        print("psycopg2 ProgrammingError: " + e)
+        print("psycopg2 ProgrammingError: " + str(e))
 
 def initialize_db():
 

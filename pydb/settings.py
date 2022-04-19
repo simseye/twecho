@@ -100,10 +100,10 @@ def set_apiv2(config):
              config['auth']['ACCESS_TOKEN'],
              config['auth']['ACCESS_TOKEN_SECRET'],
              return_type = requests.Response,
-             wait_on_rate_limit=True)
+             wait_on_rate_limit=False)
 
 def set_apiv1(config):
     global api
     auth = tweepy.OAuthHandler(config['auth']['CONSUMER_KEY'], config['auth']['CONSUMER_SECRET'])
     auth.set_access_token(config['auth']['ACCESS_TOKEN'], config['auth']['ACCESS_TOKEN_SECRET'])
-    api = tweepy.API(auth, wait_on_rate_limit=True)
+    api = tweepy.API(auth, wait_on_rate_limit=False)
